@@ -1,16 +1,13 @@
-#!/usr/bin/env python3
-
 ##################################################################
 ## MODULES
 ##################################################################
 import os
 import cv2
 import numpy as np
-
-from imgaug import augmenters as iaa
+import urllib.request
 
 ## useful resources:
-## https://github.com/aleju/imgaug
+## https://pythonprogramming.net/haar-cascade-object-detection-python-opencv-tutorial/
 
 ##################################################################
 ## PREPARE TERMINAL/CODE
@@ -20,17 +17,31 @@ os.system('clear') # clear terminal window
 ##################################################################
 ## FUNCTIONS
 ##################################################################
-def meetCondition(element):
-    if element.endswith('.jpg') and not(element.__contains__('aug')):
-            return True
-    return False
-
 def createFilePath(names):
     ''' creatFilePath
     PURPOSE / OUTPUT:
         Turn an ordered list of names and concatinate them into a filepath.
     '''
     return ('/'.join([x for x in names if x != ''])).replace('//', '/')
+
+def store_raw_images():
+    neg_images_link = '/image-net.org/api/text/imagenet.synset.geturls?wnid=n00523513'   
+    neg_image_urls = urllib.request.urlopen(neg_images_link).read().decode()
+    pic_num = 1
+    if not os.path.exists('neg'):
+        os.makedirs('neg')
+    for i in neg_image_urls.split('\n'):
+        try:
+            print(i)
+            urllib.request.urlretrieve(i, "neg/"+str(pic_num)+".jpg")
+            img = cv2.imread("neg/"+str(pic_num)+".jpg", cv2.IMREAD_GRAYSCALE)
+            # should be larger than samples / pos pic (so we can place our image on it)
+            resized_image = cv2.resize(img, (100, 100))
+            cv2.imwrite("neg/"+str(pic_num)+".jpg",resized_image)
+            pic_num += 1
+            
+        except Exception as e:
+            print(str(e))  
 
 ##################################################################
 ## CREATING SET OF DISTORTED IMAGES
@@ -63,6 +74,8 @@ for i in range(len(sub_folder_names)):
         print(' ')
     ## list of target images to apply augmentations to
     list_image_names = list(filter(meetCondition, sorted(os.listdir(tmp_filepath_name))))
+    print('\t Total of ' + str(len(list_image_names)) + ' target images...')
+    print('\t Creating ' + str(N) + ' distorted images...')
     ## for each target image
     for j in range(len(list_image_names)):
         print('\t Applying distortions to: ' + list_image_names[j])
