@@ -1,4 +1,4 @@
-from picamera.array import PiRGBArray
+ from picamera.array import PiRGBArray
 from picamera import PiCamera
 from datetime import datetime
 import time
@@ -25,10 +25,10 @@ camera.resolution = (IMAGE_WIDTH,IMAGE_HEIGHT)
 try:
     while True:
         # capture image
-        imageCapture = PiRGBArray(camera, size = (640,480))
+        imageCapture = PiRGBArray(camera, size = (IMAGE_WIDTH,IMAGE_HEIGHT))
         # format image
         camera.capture(imageCapture, format="bgr")
-        image = imageCapture.array        
+        image = imageCapture.array
         # format the image to grayscale
         gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
         # identify any faces in the image
