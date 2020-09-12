@@ -46,7 +46,7 @@ bool_aug_delete = 1
 seq = iaa.Sequential([
     iaa.MotionBlur(k=[3, 5], angle=[-45, 45]), # apply motion blur
     iaa.AdditiveGaussianNoise(scale=(2, 5))    # introduce gaussian noise
-], random_order=True)                           # apply distortions in a random order
+], random_order=True)                          # apply distortions in a random order
 
 ## for each target folder
 for i in range(len(sub_folder_names)):
