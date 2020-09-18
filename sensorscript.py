@@ -127,7 +127,7 @@ def other_sensors(e):
     global WAIT_TIME, stop_threads
 
     WAIT_TIME_SECONDS = 1
-    CalibrateTime = 40
+    CalibrateTime = 120
     mode = 0
     counter = 0
     ticker = Event()
@@ -169,7 +169,15 @@ def other_sensors(e):
                              "nh3":{"data": nh3_val, "unit": "%"}}
                 }
             print(data)
-            r = requests.post(sensorsurl, json=data)
+            try:
+                r = requests.post(sensorsurl, json=data, timeout=0.01)
+            except requests.Timeout:
+                # back off and retry
+                pass
+            except requests.ConnectionError:
+                pass
+
+
 
 
 def noise_sensor(e):
@@ -222,7 +230,15 @@ def noise_sensor(e):
                 "noise": {"data": dbSPL, "unit": "dbSPL"}
             }
             print(data)
-            r = requests.post(noisesensorurl, json=data)
+
+            try:
+                r = requests.post(noisesensorurl, json=data, timeout=0.01)
+            except requests.Timeout:
+                # back off and retry
+                pass
+            except requests.ConnectionError:
+                pass
+
 
         else:
             sdata = stream.read(CHUNK)
@@ -253,7 +269,7 @@ if __name__ == '__main__':
     except KeyboardInterrupt:
         print('Closing threads...')
         stop_threads = True
-        # if program closed before thread 1 flags calibration is done, ensure thread 2 is unblock and hence able to run to completion
+        # if program closed before thread 1 flags calibration is done, ensure thread 2 is unblocked and hence able to run to completion
         if not e.isSet():
             e.set()
         # Wait for the threads to close
