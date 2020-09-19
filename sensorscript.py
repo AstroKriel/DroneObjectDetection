@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-
 import time
 import colorsys
 import sys
@@ -34,8 +33,7 @@ noise = Noise()
 audio = pyaudio.PyAudio()
 
 # This is the url that sensor data will be posted to
-sensorsurl = "http://192.168.0.156:5000/data"
-noisesensorurl = "http://192.168.0.156:5000/noisedata"
+sensorsurl = "http://192.168.0.156:5000/sensordata"
 
 #Full-scale dB range of microphone
 WAIT_TIME = 10
@@ -232,7 +230,7 @@ def noise_sensor(e):
             print(data)
 
             try:
-                r = requests.post(noisesensorurl, json=data, timeout=0.01)
+                r = requests.post(sensorsurl, json=data, timeout=0.01)
             except requests.Timeout:
                 # back off and retry
                 pass
