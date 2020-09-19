@@ -260,7 +260,7 @@ if __name__ == '__main__':
         t2.start()
 
         # Keep the main thread running, otherwise signals are ignored.
-        while True:
+        while True: # <- swap with "for frame in camera.capture_continuous()" loop"
             # image-processing can go here...
             time.sleep(1)
 
