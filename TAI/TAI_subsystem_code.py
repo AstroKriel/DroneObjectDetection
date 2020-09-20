@@ -13,7 +13,7 @@ IMAGE_WIDTH = 640
 IMAGE_HEIGHT = 480
 FRAME_RATE = 5
 
-# This is the url that sensor data will be posted to
+# This is the url that image data will be posted to
 imagesurl = "http://192.168.0.156:5000/images"
 
 # Import the relevant ArUco marker dictionary
@@ -47,13 +47,12 @@ def detect_Aruco(image):
     # Detect the markers.
     corners, ids, rejectedImgPoints = aruco.detectMarkers(gray,aruco_dict,parameters=parameters)
 
-    # Log the number of ArUco markers detected
-    detected = len(corners)
+    # Markup the original image if marker detected
+    if (len(corners) > 0):
+        image = aruco.drawDetectedMarkers(image, corners, ids)
+        ids = ids.flatten()
 
-    # Draw marker detection onto the original image
-    image = aruco.drawDetectedMarkers(image, corners, ids)
-
-    return image, detected
+    return image, ids
 
 
 # Process image to detect any A type targets
@@ -62,12 +61,19 @@ def detect_Targets(image):
     ##### Put Neco's target detection code #####
 
     # return updated image with detected target boxes #
-    # return the number of type a targets detected #
-    return image, detected
+    # return the  type of targets detected #
+    detectedTargets = [None] * 2
+    # if (A1 detected):
+    #     detectedTargets[0] = True
+    # if (A2 detected):
+    #     detectedTargets[1] = True
+    
+
+    return image, detectedTargets
 
 
 # Send current image to GCS
-def send_Image(image, detected, timestamp):
+def send_Image(image, timestamp, detectedArucos, detectedTargets):
     global imagesurl
     # Set loop iterationstart time - Just for testing
     # start = time.time()
@@ -77,9 +83,15 @@ def send_Image(image, detected, timestamp):
 
     # Create headers
     headers = {
-        'imageTimestamp': str(timestamp.strftime('%Y-%m-%d_%H:%M:%S')),
-        'numTargetsdetected': str(detected) # int of the number of images detected
+        'imageTimestamp': str(timestamp.strftime('%Y-%m-%d_%H:%M:%S'))
     }
+    
+    if (detectedTargets[0] is not None):
+        headers['A1-detected'] = 'True'
+    if (detectedTargets[1] is not None):
+        headers['A2-detected'] = 'True'
+    if (detectedArucos is not None):
+        headers['B-detected'] = str(detectedArucos)
 
     # Import image as file
     image_file = open('current_image.jpg', 'rb')
@@ -111,15 +123,13 @@ for frame in camera.capture_continuous(rawCapture, format="bgr", use_video_port=
     timestamp = datetime.now()
 
     image, detectedArucos = detect_Aruco(image)
-    #image, detectedTargets = detect_Targets(image)
-    
-    detected = detectedArucos # + detectedTargets
+    image, detectedTargets = detect_Targets(image)
 
     # Create thread to save and post image
-    Thread(target=send_Image, args=(image, detected, timestamp)).start()
-
-    # Print loop duration - Just for testing
-    # print ('T1' + str(time.time() - start)) 
+    Thread(target=send_Image, args=(image, timestamp, detectedArucos, detectedTargets)).start()
 
     # clear the stream in preparation for the next frame
     rawCapture.truncate(0)
+
+    # Print loop duration - Just for testing
+    # print ('T1' + str(time.time() - start)) 
