@@ -31,7 +31,7 @@ from cv2 import aruco
 # Define resolution and framerate for captured video
 IMAGE_WIDTH = 640
 IMAGE_HEIGHT = 480
-FRAME_RATE = 5
+FRAME_RATE = 4
 
 # Import the relevant ArUco marker dictionary
 aruco_dict = aruco.Dictionary_get(aruco.DICT_5X5_100)
@@ -53,6 +53,7 @@ imagesurl = "http://192.168.0.156:5000/images"
 
 #Full-scale dB range of microphone
 WAIT_TIME = 10
+SENSOR_TIMEOUT = 0.1
 
 stop_threads = False
 
@@ -184,7 +185,7 @@ def other_sensors(e):
                 }
             print(data)
             try:
-                r = requests.post(sensorsurl, json=data, timeout=0.01)
+                r = requests.post(sensorsurl, json=data, timeout=SENSOR_TIMEOUT)
             except requests.Timeout:
                 # back off and retry
                 pass
@@ -246,7 +247,7 @@ def noise_sensor(e):
             print(data)
 
             try:
-                r = requests.post(sensorsurl, json=data, timeout=0.01)
+                r = requests.post(sensorsurl, json=data, timeout=SENSOR_TIMEOUT)
             except requests.Timeout:
                 # back off and retry
                 pass
@@ -416,5 +417,5 @@ if __name__ == '__main__':
             e.set()
         # Wait for the threads to close
         t1.join()
-        # starting thread 2
         t2.join()
+        t3.join()
