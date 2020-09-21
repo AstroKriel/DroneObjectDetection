@@ -6,7 +6,7 @@ import requests
 import numpy as np
 import cv2
 from cv2 import aruco
-from threading import Thread
+from threading import Thread, Event
 
 # Define resolution and framerate for captured video
 IMAGE_WIDTH = 640
@@ -20,6 +20,7 @@ imagesurl = "http://192.168.0.156:5000/images"
 aruco_dict = aruco.Dictionary_get(aruco.DICT_5X5_100)
 parameters = aruco.DetectorParameters_create()
 
+stop_threads = False
 
 # Initialise camera
 def init_Camera():
@@ -111,25 +112,50 @@ def send_Image(image, timestamp, detectedArucos, detectedTargets):
 
 
 
-camera, rawCapture = init_Camera()
+def image_processing(e):
+    global stop_threads
 
-# capture frames from the camera
-for frame in camera.capture_continuous(rawCapture, format="bgr", use_video_port=True):
-    # Set loop iterationstart time - Just for testing
-    # start = time.time()
-    
-    # Capture image using the PiCamera
-    image = rawCapture.array
-    timestamp = datetime.now()
+    # Setup PiCamera
+    camera, rawCapture = init_Camera()
 
-    image, detectedArucos = detect_Aruco(image)
-    image, detectedTargets = detect_Targets(image)
+    # Keep the main thread running, otherwise signals are ignored.
+    for frame in camera.capture_continuous(rawCapture, format="bgr", use_video_port=True):
+        # # Set loop iterationstart time - Just for testing
+        # start = time.time()
+        
+        # Capture image using the PiCamera
+        image = rawCapture.array
+        timestamp = datetime.now()
 
-    # Create thread to save and post image
-    Thread(target=send_Image, args=(image, timestamp, detectedArucos, detectedTargets)).start()
+        image, detectedArucos = detect_Aruco(image)
+        image, detectedTargets = detect_Targets(image)
 
-    # clear the stream in preparation for the next frame
-    rawCapture.truncate(0)
+        # Create thread to save and post image
+        Thread(target=send_Image, args=(image, timestamp, detectedArucos, detectedTargets)).start()
 
-    # Print loop duration - Just for testing
-    # print ('T1' + str(time.time() - start)) 
+        # clear the stream in preparation for the next frame
+        rawCapture.truncate(0)
+
+        # Break loop if threads stopped
+        if (stop_threads):
+            break
+
+        # # Print loop duration - Just for testing
+        # print ('T1' + str(time.time() - start))
+
+
+
+if __name__ == '__main__':
+    try:
+            # event to synchronise threads to ensure they start at the same time
+            e = Event()
+            t3 = Thread(target=image_processing, args=(e,))
+            # starting thread 3
+            t3.start()
+
+            while (True):
+                time.sleep(1)
+
+    except KeyboardInterrupt:
+        print('Closing threads...')
+        stop_threads = True

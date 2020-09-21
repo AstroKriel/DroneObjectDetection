@@ -357,40 +357,55 @@ def send_Image(image, timestamp, detectedArucos, detectedTargets):
     # print ('T2' + str(time.time() - start)) 
 
 
+def image_processing(e):
+    global stop_threads
+
+    # Setup PiCamera
+    camera, rawCapture = init_Camera()
+
+    # Keep the main thread running, otherwise signals are ignored.
+    for frame in camera.capture_continuous(rawCapture, format="bgr", use_video_port=True):
+        # # Set loop iterationstart time - Just for testing
+        # start = time.time()
+        
+        # Capture image using the PiCamera
+        image = rawCapture.array
+        timestamp = datetime.now()
+
+        image, detectedArucos = detect_Aruco(image)
+        image, detectedTargets = detect_Targets(image)
+
+        # Create thread to save and post image
+        Thread(target=send_Image, args=(image, timestamp, detectedArucos, detectedTargets)).start()
+
+        # clear the stream in preparation for the next frame
+        rawCapture.truncate(0)
+
+        # Break loop if threads stopped
+        if (stop_threads):
+            break
+
+        # # Print loop duration - Just for testing
+        # print ('T1' + str(time.time() - start)) 
+
+
 if __name__ == '__main__':
     try:
         # event to synchronise threads to ensure they start at the same time
         e = Event()
         t1 = Thread(target=other_sensors, args=(e,))
         t2 = Thread(target=noise_sensor, args=(e,))
+        t3 = Thread(target=image_processing, args=(e,))
         # starting thread 1
         t1.start()
         # starting thread 2
         t2.start()
+        # starting thread 3
+        t3.start()
 
-        # Setup PiCamera
-        camera, rawCapture = init_Camera()
-
-        # Keep the main thread running, otherwise signals are ignored.
-        for frame in camera.capture_continuous(rawCapture, format="bgr", use_video_port=True):
-            # Set loop iterationstart time - Just for testing
-            # start = time.time()
-            
-            # Capture image using the PiCamera
-            image = rawCapture.array
-            timestamp = datetime.now()
-
-            image, detectedArucos = detect_Aruco(image)
-            image, detectedTargets = detect_Targets(image)
-
-            # Create thread to save and post image
-            Thread(target=send_Image, args=(image, timestamp, detectedArucos, detectedTargets)).start()
-
-            # clear the stream in preparation for the next frame
-            rawCapture.truncate(0)
-
-            # Print loop duration - Just for testing
-            # print ('T1' + str(time.time() - start)) 
+        # main loop
+        while (True):
+            time.sleep(1)
 
 
     except KeyboardInterrupt:
