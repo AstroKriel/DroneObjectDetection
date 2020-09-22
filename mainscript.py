@@ -28,14 +28,34 @@ from picamera import PiCamera
 from datetime import datetime
 from cv2 import aruco
 
+
+
+# Set the IP address and port number of the ground control station
+gcs_address = "http://192.168.1.101:9000"
+
+# Endpoint for the sensor data
+SENSOR_ENDPOINT = gcs_address + "/sensor_data"
+# Endpoint for the image data
+IMAGE_ENDPOINT = gcs_address + "/image"
+
+# Post timeout
+POST_TIMEOUT = 4
+
+# Stop threads on keyboard interrupt
+STOP_THREADS = False
+
+
+
 # Define resolution and framerate for captured video
 IMAGE_WIDTH = 640
 IMAGE_HEIGHT = 480
 FRAME_RATE = 4
 
 # Import the relevant ArUco marker dictionary
-aruco_dict = aruco.Dictionary_get(aruco.DICT_5X5_100)
-parameters = aruco.DetectorParameters_create()
+ARUCO_DICT = aruco.Dictionary_get(aruco.DICT_5X5_100)
+ARUCO_PARAMETERS = aruco.DetectorParameters_create()
+
+
 
 # BME280 temperature/pressure/humidity sensor
 bme280 = BME280()
@@ -46,16 +66,10 @@ noise = Noise()
 # initialise audio
 audio = pyaudio.PyAudio()
 
-# This is the url that sensor data will be posted to
-sensorsurl = "http://192.168.0.156:5000/sensordata"
-# This is the url that image data will be posted to
-imagesurl = "http://192.168.0.156:5000/images"
-
-#Full-scale dB range of microphone
+# Full-scale dB range of microphone
 WAIT_TIME = 10
-SENSOR_TIMEOUT = 0.1
 
-stop_threads = False
+
 
 # function to convert from PCM to dbSPL
 def PCM_to_dbSPL(pcm):
@@ -139,14 +153,14 @@ def retrieve_gas():
 
 # The main loop
 def other_sensors(e):
-    global WAIT_TIME, stop_threads
+    global WAIT_TIME, POST_TIMEOUT, STOP_THREADS
 
     WAIT_TIME_SECONDS = 1
     CalibrateTime = 120
     mode = 0
     counter = 0
     ticker = Event()
-    while not stop_threads:
+    while not STOP_THREADS:
         if not ticker.wait(WAIT_TIME_SECONDS):
             if mode == 0:
                 counter = counter + 1
@@ -185,7 +199,7 @@ def other_sensors(e):
                 }
             print(data)
             try:
-                r = requests.post(sensorsurl, json=data, timeout=SENSOR_TIMEOUT)
+                r = requests.post(SENSOR_ENDPOINT, json=data, timeout=POST_TIMEOUT)
             except requests.Timeout:
                 # back off and retry
                 pass
@@ -196,7 +210,7 @@ def other_sensors(e):
 
 
 def noise_sensor(e):
-    global WAIT_TIME, stop_threads
+    global WAIT_TIME, POST_TIMEOUT, STOP_THREADS
 
     if not e.isSet():
         e.wait()
@@ -217,7 +231,7 @@ def noise_sensor(e):
     Cnt = 0
     noisefloor = 1e12
     maxSPL = 0.0
-    while not stop_threads:
+    while not STOP_THREADS:
         if MSec >= 1000*WAIT_TIME:
             sdata = stream.read(CHUNK)
             idata = np.frombuffer(bytes(sdata), '<i4')
@@ -247,7 +261,7 @@ def noise_sensor(e):
             print(data)
 
             try:
-                r = requests.post(sensorsurl, json=data, timeout=SENSOR_TIMEOUT)
+                r = requests.post(SENSOR_ENDPOINT, json=data, timeout=POST_TIMEOUT)
             except requests.Timeout:
                 # back off and retry
                 pass
@@ -288,11 +302,13 @@ def init_Camera():
 
 # Process image to detect any Aruco markers
 def detect_Aruco(image):
+    global ARUCO_DICT, ARUCO_PARAMETERS
+
     # Convert captured image to grayscale
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
     # Detect the markers.
-    corners, ids, rejectedImgPoints = aruco.detectMarkers(gray,aruco_dict,parameters=parameters)
+    corners, ids, rejectedImgPoints = aruco.detectMarkers(gray,ARUCO_DICT,parameters=ARUCO_PARAMETERS)
 
     # Markup the original image if marker detected
     if (len(corners) > 0):
@@ -309,7 +325,7 @@ def detect_Targets(image):
     ##### Put Neco's target detection code #####
 
     # return updated image with detected target boxes #
-    # return the  type of targets detected #
+    # return the type of targets detected #
     detectedTargets = [None] * 2
     # if (A1 detected):
     #     detectedTargets[0] = True
@@ -322,7 +338,7 @@ def detect_Targets(image):
 
 # Send current image to GCS
 def send_Image(image, timestamp, detectedArucos, detectedTargets):
-    global imagesurl
+    global POST_TIMEOUT, IMAGE_ENDPOINT
     # Set loop iterationstart time - Just for testing
     # start = time.time()
 
@@ -344,14 +360,15 @@ def send_Image(image, timestamp, detectedArucos, detectedTargets):
     # Import image as file
     image_file = open('current_image.jpg', 'rb')
     files = {'current_image.jpg': image_file}
-    # Post file to endpoint "http://192.168.0.156:5000/images"
+    # Post file to "image" endpoint
     try:
-        res = requests.post(imagesurl, files=files, headers=headers, timeout=4)
+        res = requests.post(IMAGE_ENDPOINT, files=files, headers=headers, timeout=POST_TIMEOUT)
     except requests.Timeout:
         pass
     except requests.ConnectionError:
         pass
-
+    
+    print(res)
     image_file.close()
 
     # Print loop duration - Just for testing
@@ -359,7 +376,7 @@ def send_Image(image, timestamp, detectedArucos, detectedTargets):
 
 
 def image_processing(e):
-    global stop_threads
+    global STOP_THREADS
 
     # Setup PiCamera
     camera, rawCapture = init_Camera()
@@ -383,7 +400,7 @@ def image_processing(e):
         rawCapture.truncate(0)
 
         # Break loop if threads stopped
-        if (stop_threads):
+        if (STOP_THREADS):
             break
 
         # # Print loop duration - Just for testing
@@ -411,7 +428,7 @@ if __name__ == '__main__':
 
     except KeyboardInterrupt:
         print('Closing threads...')
-        stop_threads = True
+        STOP_THREADS = True
         # if program closed before thread 1 flags calibration is done, ensure thread 2 is unblocked and hence able to run to completion
         if not e.isSet():
             e.set()
