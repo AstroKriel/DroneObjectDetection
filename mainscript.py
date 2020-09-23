@@ -55,7 +55,9 @@ FRAME_RATE = 4
 ARUCO_DICT = aruco.Dictionary_get(aruco.DICT_5X5_100)
 ARUCO_PARAMETERS = aruco.DetectorParameters_create()
 
-
+# Load cascade classifier for targets A1 and A2
+A1_cascade = cv2.CascadeClassifier('cascade_A1.xml')
+A2_cascade = cv2.CascadeClassifier('cascade_A2.xml')
 
 # BME280 temperature/pressure/humidity sensor
 bme280 = BME280()
@@ -301,11 +303,8 @@ def init_Camera():
 
 
 # Process image to detect any Aruco markers
-def detect_Aruco(image):
+def detect_Aruco(image, gray):
     global ARUCO_DICT, ARUCO_PARAMETERS
-
-    # Convert captured image to grayscale
-    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
     # Detect the markers.
     corners, ids, rejectedImgPoints = aruco.detectMarkers(gray,ARUCO_DICT,parameters=ARUCO_PARAMETERS)
@@ -320,18 +319,32 @@ def detect_Aruco(image):
 
 
 # Process image to detect any A type targets
-def detect_Targets(image):
+def detect_Targets(image, gray):
 
     ##### Put Neco's target detection code #####
-
-    # return updated image with detected target boxes #
-    # return the type of targets detected #
     detectedTargets = [None] * 2
-    # if (A1 detected):
-    #     detectedTargets[0] = True
-    # if (A2 detected):
-    #     detectedTargets[1] = True
-    
+    # Detect A1 targets
+    targets = A1_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=3, minSize=(100,100))#, maxSize=(200,200))
+     
+    # If A1 target detected then update detected targets
+    print(targets)
+    if (targets is not None):
+        detectedTargets[0] = True
+        # print('target a1 detected')
+    # Only if no A1 targets are detected should target A markers be searched for
+    else:
+        targets = A2_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=3, minSize=(100,100))#, maxSize=(200,200))
+        # If A2 target detected then update detected targets
+        if (targets is not None):
+            detectedTargets[1] = True
+            print('target a2 detected')
+        
+    # If any targets are detected then drax indicator in image
+    if (targets is not None):
+        for (x, y, w, h) in targets:
+            cv2.rectangle(image, (x, y), (x+w, y+h), (255, 0, 0), 2)
+
+    # return updated image with detected target boxes   
     return image, detectedTargets
 
 
@@ -390,8 +403,13 @@ def image_processing(e):
         image = rawCapture.array
         timestamp = datetime.now()
 
-        image, detectedArucos = detect_Aruco(image)
-        image, detectedTargets = detect_Targets(image)
+        # Convert captured image to grayscale
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+
+        image, detectedArucos = detect_Aruco(image, gray)
+        # Only if no Aruco markers are detected should target A markers be searched for
+        if (detectedArucos is None):
+            image, detectedTargets = detect_Targets(image, gray)
 
         # Create thread to save and post image
         Thread(target=send_Image, args=(image, timestamp, detectedArucos, detectedTargets)).start()
