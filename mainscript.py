@@ -47,12 +47,10 @@ POST_TIMEOUT = 4
 # Stop threads on keyboard interrupt
 STOP_THREADS = False
 
-
-
 # Define resolution and framerate for captured video
 IMAGE_WIDTH = 640
 IMAGE_HEIGHT = 480
-FRAME_RATE = 4
+FRAME_RATE = 2
 
 # Import the relevant ArUco marker dictionary
 ARUCO_DICT = aruco.Dictionary_get(aruco.DICT_5X5_100)
@@ -73,8 +71,6 @@ audio = pyaudio.PyAudio()
 
 # Full-scale dB range of microphone
 WAIT_TIME = 10
-
-
 
 # function to convert from PCM to dbSPL
 def PCM_to_dbSPL(pcm):
@@ -161,7 +157,7 @@ def other_sensors(e):
     global WAIT_TIME, SENSOR_POST_TIMEOUT, STOP_THREADS
 
     WAIT_TIME_SECONDS = 1
-    CalibrateTime = 120
+    CalibrateTime = 20
     mode = 0
     counter = 0
     ticker = Event()
@@ -354,6 +350,7 @@ def detect_Targets(image, gray):
 
 # Send current image to GCS
 def send_Image(image, timestamp, detectedArucos, detectedTargets):
+#def send_Image(image, timestamp):
     global POST_TIMEOUT, IMAGE_ENDPOINT
     # Set loop iterationstart time - Just for testing
     # start = time.time()
@@ -365,7 +362,7 @@ def send_Image(image, timestamp, detectedArucos, detectedTargets):
     headers = {
         'imageTimestamp': str(timestamp.strftime('%Y-%m-%d_%H:%M:%S'))
     }
-    
+
     if (detectedTargets[0] is not None):
         headers['A1-detected'] = 'True'
     if (detectedTargets[1] is not None):
@@ -410,12 +407,13 @@ def image_processing(e):
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
         image, detectedArucos = detect_Aruco(image, gray)
-        # Only if no Aruco markers are detected should target A markers be searched for
+        ## Only if no Aruco markers are detected should target A markers be searched for
         if (detectedArucos is None):
             image, detectedTargets = detect_Targets(image, gray)
 
         # Create thread to save and post image
         Thread(target=send_Image, args=(image, timestamp, detectedArucos, detectedTargets)).start()
+        #Thread(target=send_Image, args=(image, timestamp)).start()
 
         # clear the stream in preparation for the next frame
         rawCapture.truncate(0)
@@ -434,18 +432,17 @@ if __name__ == '__main__':
         e = Event()
         t1 = Thread(target=other_sensors, args=(e,))
         t2 = Thread(target=noise_sensor, args=(e,))
-        #t3 = Thread(target=image_processing, args=(e,))
+        t3 = Thread(target=image_processing, args=(e,))
         # starting thread 1
         t1.start()
         # starting thread 2
         t2.start()
         # starting thread 3
-        #t3.start()
+        t3.start()
 
         # main loop
         while (True):
             time.sleep(1)
-
 
     except KeyboardInterrupt:
         print('Closing threads...')
@@ -456,4 +453,4 @@ if __name__ == '__main__':
         # Wait for the threads to close
         t1.join()
         t2.join()
-        #t3.join()
+        t3.join()
