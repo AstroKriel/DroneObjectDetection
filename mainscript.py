@@ -31,12 +31,15 @@ from cv2 import aruco
 
 
 # Set the IP address and port number of the ground control station
-gcs_address = "http://192.168.1.101:9000"
+gcs_address = "http://192.168.43.64:9000"
 
 # Endpoint for the sensor data
 SENSOR_ENDPOINT = gcs_address + "/sensor_data"
 # Endpoint for the image data
 IMAGE_ENDPOINT = gcs_address + "/image"
+
+# Sensor Post timeout
+SENSOR_POST_TIMEOUT = 0.5
 
 # Post timeout
 POST_TIMEOUT = 4
@@ -155,7 +158,7 @@ def retrieve_gas():
 
 # The main loop
 def other_sensors(e):
-    global WAIT_TIME, POST_TIMEOUT, STOP_THREADS
+    global WAIT_TIME, SENSOR_POST_TIMEOUT, STOP_THREADS
 
     WAIT_TIME_SECONDS = 1
     CalibrateTime = 120
@@ -168,7 +171,7 @@ def other_sensors(e):
                 counter = counter + 1
                 baseline_oxidising, baseline_reducing, baseline_nh3 = retrieve_gas()
                 data = {
-                    "msg" : "%s seconds of calibration left" % (CalibrateTime-counter)
+                    "msg" : {"data": "%s seconds of calibration left" % (CalibrateTime-counter)}
                 }
                 if counter == CalibrateTime:
                     baseline_data_oxidising = baseline_oxidising["data"]
@@ -201,7 +204,7 @@ def other_sensors(e):
                 }
             print(data)
             try:
-                r = requests.post(SENSOR_ENDPOINT, json=data, timeout=POST_TIMEOUT)
+                r = requests.post(SENSOR_ENDPOINT, json=data, timeout=SENSOR_POST_TIMEOUT)
             except requests.Timeout:
                 # back off and retry
                 pass
@@ -212,7 +215,7 @@ def other_sensors(e):
 
 
 def noise_sensor(e):
-    global WAIT_TIME, POST_TIMEOUT, STOP_THREADS
+    global WAIT_TIME, SENSOR_POST_TIMEOUT, STOP_THREADS
 
     if not e.isSet():
         e.wait()
@@ -263,7 +266,7 @@ def noise_sensor(e):
             print(data)
 
             try:
-                r = requests.post(SENSOR_ENDPOINT, json=data, timeout=POST_TIMEOUT)
+                r = requests.post(SENSOR_ENDPOINT, json=data, timeout=SENSOR_POST_TIMEOUT)
             except requests.Timeout:
                 # back off and retry
                 pass
@@ -431,13 +434,13 @@ if __name__ == '__main__':
         e = Event()
         t1 = Thread(target=other_sensors, args=(e,))
         t2 = Thread(target=noise_sensor, args=(e,))
-        t3 = Thread(target=image_processing, args=(e,))
+        #t3 = Thread(target=image_processing, args=(e,))
         # starting thread 1
         t1.start()
         # starting thread 2
         t2.start()
         # starting thread 3
-        t3.start()
+        #t3.start()
 
         # main loop
         while (True):
@@ -453,4 +456,4 @@ if __name__ == '__main__':
         # Wait for the threads to close
         t1.join()
         t2.join()
-        t3.join()
+        #t3.join()
