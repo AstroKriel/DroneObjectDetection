@@ -31,12 +31,12 @@ from cv2 import aruco
 
 
 # Set the IP address and port number of the ground control station
-gcs_address = "http://192.168.43.64:9000"
+GCS_ADDRESS = "http://192.168.43.64:9000"
 
 # Endpoint for the sensor data
-SENSOR_ENDPOINT = gcs_address + "/sensor_data"
+SENSOR_ENDPOINT = GCS_ADDRESS + "/sensor_data"
 # Endpoint for the image data
-IMAGE_ENDPOINT = gcs_address + "/image"
+IMAGE_ENDPOINT = GCS_ADDRESS + "/image"
 
 # Sensor Post timeout
 SENSOR_POST_TIMEOUT = 0.5
@@ -46,6 +46,7 @@ POST_TIMEOUT = 4
 
 # Stop threads on keyboard interrupt
 STOP_THREADS = False
+
 
 # Define resolution and framerate for captured video
 IMAGE_WIDTH = 640
@@ -57,8 +58,13 @@ ARUCO_DICT = aruco.Dictionary_get(aruco.DICT_5X5_100)
 ARUCO_PARAMETERS = aruco.DetectorParameters_create()
 
 # Load cascade classifier for targets A1 and A2
-A1_cascade = cv2.CascadeClassifier('cascade_A1.xml')
-A2_cascade = cv2.CascadeClassifier('cascade_A2.xml')
+A1_CASCADE = cv2.CascadeClassifier('cascade_A1.xml')
+# A2_CASCADE = cv2.CascadeClassifier('cascade_A2.xml')
+
+# Color mask Params
+LOWER_YELLOW = np.array([25,100,100])
+UPPER_YELLOW = np.array([35,255,255])
+
 
 # BME280 temperature/pressure/humidity sensor
 bme280 = BME280()
@@ -312,36 +318,33 @@ def detect_Aruco(image, gray):
     if (len(corners) > 0):
         image = aruco.drawDetectedMarkers(image, corners, ids)
         ids = ids.flatten()
+        print('Aruco marker detected')
 
     return image, ids
 
 
 
 # Process image to detect any A type targets
-def detect_Targets(image, gray):
-
-    ##### Put Neco's target detection code #####
-    detectedTargets = [None] * 2
-    # Detect A1 targets
-    targets = A1_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=3, minSize=(100,100))#, maxSize=(200,200))
-     
-    # If A1 target detected then update detected targets
-    print(targets)
-    if (targets is not None):
-        detectedTargets[0] = True
-        # print('target a1 detected')
-    # Only if no A1 targets are detected should target A markers be searched for
+def detect_Targets(image, gray, detectedTargets):
+    global LOWER_YELLOW, UPPER_YELLOW, A1_CASCADE
+    # Detect A2 targets using color mask
+    hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+    yellow_mask = cv2.inRange(hsv, LOWER_YELLOW, UPPER_YELLOW)
+    # If A2 target detected then update detected targets
+    if sum(sum(yellow_mask)) > 50:
+        detectedTargets[1] = True
+        print('target a2 detected')
+        ############### NEED TO ADD BOUNDARY BOX FOR DETECTED TARGET CODE HERE ###############
+    # Detect A1 targets using cascade classifier
     else:
-        targets = A2_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=3, minSize=(100,100))#, maxSize=(200,200))
-        # If A2 target detected then update detected targets
-        if (targets is not None):
-            detectedTargets[1] = True
-            print('target a2 detected')
-        
-    # If any targets are detected then drax indicator in image
-    if (targets is not None):
-        for (x, y, w, h) in targets:
-            cv2.rectangle(image, (x, y), (x+w, y+h), (255, 0, 0), 2)
+        targets = A1_CASCADE.detectMultiScale(gray, 1.05, 1, 0|cv2.CASCADE_SCALE_IMAGE, minSize=(30,30))
+        # If A1 target detected then update detected targets
+        if (len(targets) > 0):
+            detectedTargets[0] = True
+            print('target a1 detected')
+            # Draw boundary box for deteted target on image
+            for (x, y, w, h) in targets:
+                cv2.rectangle(image, (x, y), (x+w, y+h), (255, 0, 0), 2)
 
     # return updated image with detected target boxes   
     return image, detectedTargets
@@ -380,12 +383,11 @@ def send_Image(image, timestamp, detectedArucos, detectedTargets):
         pass
     except requests.ConnectionError:
         pass
-    
-    print(res)
+
     image_file.close()
 
     # Print loop duration - Just for testing
-    # print ('T2' + str(time.time() - start)) 
+    # print (str(time.time() - start)) 
 
 
 def image_processing(e):
@@ -406,10 +408,12 @@ def image_processing(e):
         # Convert captured image to grayscale
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
+        detectedTargets = [None] * 2
+
         image, detectedArucos = detect_Aruco(image, gray)
         ## Only if no Aruco markers are detected should target A markers be searched for
         if (detectedArucos is None):
-            image, detectedTargets = detect_Targets(image, gray)
+            image, detectedTargets = detect_Targets(image, gray, detectedTargets)
 
         # Create thread to save and post image
         Thread(target=send_Image, args=(image, timestamp, detectedArucos, detectedTargets)).start()
@@ -423,7 +427,7 @@ def image_processing(e):
             break
 
         # # Print loop duration - Just for testing
-        # print ('T1' + str(time.time() - start)) 
+        # print (str(time.time() - start)) 
 
 
 if __name__ == '__main__':
