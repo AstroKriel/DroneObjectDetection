@@ -54,7 +54,9 @@ IMAGE_HEIGHT = 480
 FRAME_RATE = 2
 
 # Import the relevant ArUco marker dictionary
-ARUCO_DICT = aruco.Dictionary_get(aruco.DICT_5X5_100)
+ARUCO_DICT_100 = aruco.Dictionary_get(aruco.DICT_5X5_100)
+ARUCO_DICT_250 = aruco.Dictionary_get(aruco.DICT_5X5_250)
+ARUCO_DICT_1000 = aruco.Dictionary_get(aruco.DICT_5X5_1000)
 ARUCO_PARAMETERS = aruco.DetectorParameters_create()
 
 # Load cascade classifier for targets A1 and A2
@@ -204,7 +206,7 @@ def other_sensors(e):
                              "reducing":{"data": reducing_val, "unit": "%"},
                              "nh3":{"data": nh3_val, "unit": "%"}}
                 }
-            print(data)
+            # print(data)
             try:
                 r = requests.post(SENSOR_ENDPOINT, json=data, timeout=SENSOR_POST_TIMEOUT)
             except requests.Timeout:
@@ -265,7 +267,7 @@ def noise_sensor(e):
             data = {
                 "noise": {"data": dbSPL, "unit": "dbSPL"}
             }
-            print(data)
+            #print(data)
 
             try:
                 r = requests.post(SENSOR_ENDPOINT, json=data, timeout=SENSOR_POST_TIMEOUT)
@@ -309,16 +311,31 @@ def init_Camera():
 
 # Process image to detect any Aruco markers
 def detect_Aruco(image, gray):
-    global ARUCO_DICT, ARUCO_PARAMETERS
+    global ARUCO_DICT_100, ARUCO_DICT_250, ARUCO_DICT_1000, ARUCO_PARAMETERS
 
     # Detect the markers.
-    corners, ids, rejectedImgPoints = aruco.detectMarkers(gray,ARUCO_DICT,parameters=ARUCO_PARAMETERS)
+    corners, ids, rejectedImgPoints = aruco.detectMarkers(gray,ARUCO_DICT_100,parameters=ARUCO_PARAMETERS)
 
     # Markup the original image if marker detected
     if (len(corners) > 0):
         image = aruco.drawDetectedMarkers(image, corners, ids)
         ids = ids.flatten()
-        print('Aruco marker detected')
+    else:
+        # Detect the markers.
+        corners, ids, rejectedImgPoints = aruco.detectMarkers(gray, ARUCO_DICT_250, parameters=ARUCO_PARAMETERS)
+
+        # Markup the original image if marker detected
+        if (len(corners) > 0):
+            image = aruco.drawDetectedMarkers(image, corners, ids)
+            ids = ids.flatten()
+        else:
+            # Detect the markers.
+            corners, ids, rejectedImgPoints = aruco.detectMarkers(gray, ARUCO_DICT_1000, parameters=ARUCO_PARAMETERS)
+
+            # Markup the original image if marker detected
+            if (len(corners) > 0):
+                image = aruco.drawDetectedMarkers(image, corners, ids)
+                ids = ids.flatten()
 
     return image, ids
 
@@ -327,24 +344,24 @@ def detect_Aruco(image, gray):
 # Process image to detect any A type targets
 def detect_Targets(image, gray, detectedTargets):
     global LOWER_YELLOW, UPPER_YELLOW, A1_CASCADE
-    # Detect A2 targets using color mask
-    hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
-    yellow_mask = cv2.inRange(hsv, LOWER_YELLOW, UPPER_YELLOW)
-    # If A2 target detected then update detected targets
-    if sum(sum(yellow_mask)) > 50:
-        detectedTargets[1] = True
-        print('target a2 detected')
-        ############### NEED TO ADD BOUNDARY BOX FOR DETECTED TARGET CODE HERE ###############
+
     # Detect A1 targets using cascade classifier
+    targets = A1_CASCADE.detectMultiScale(gray, 1.05, 1, 0 | cv2.CASCADE_SCALE_IMAGE, minSize=(30, 30))
+    # If A1 target detected then update detected targets
+    if (len(targets) > 0):
+        detectedTargets[0] = True
+        # Draw boundary box for deteted target on image
+        for (x, y, w, h) in targets:
+            cv2.rectangle(image, (x, y), (x + w, y + h), (255, 0, 0), 2)
+    # Detect A2 targets using color mask
     else:
-        targets = A1_CASCADE.detectMultiScale(gray, 1.05, 1, 0|cv2.CASCADE_SCALE_IMAGE, minSize=(30,30))
-        # If A1 target detected then update detected targets
-        if (len(targets) > 0):
-            detectedTargets[0] = True
-            print('target a1 detected')
-            # Draw boundary box for deteted target on image
-            for (x, y, w, h) in targets:
-                cv2.rectangle(image, (x, y), (x+w, y+h), (255, 0, 0), 2)
+        hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+        yellow_mask = cv2.inRange(hsv, LOWER_YELLOW, UPPER_YELLOW)
+        # If A2 target detected then update detected targets
+        if (sum(sum(yellow_mask)) > 50):
+            detectedTargets[1] = True
+            ############### NEED TO ADD BOUNDARY BOX FOR DETECTED TARGET CODE HERE ###############
+
 
     # return updated image with detected target boxes   
     return image, detectedTargets
@@ -368,10 +385,15 @@ def send_Image(image, timestamp, detectedArucos, detectedTargets):
 
     if (detectedTargets[0] is not None):
         headers['A1-detected'] = 'True'
-    if (detectedTargets[1] is not None):
+        print("A1 Detected")
+    elif (detectedTargets[1] is not None):
         headers['A2-detected'] = 'True'
-    if (detectedArucos is not None):
+        print("A2 Detected")
+    elif (detectedArucos is not None):
         headers['B-detected'] = str(detectedArucos)
+        print(str(detectedArucos))
+    else:
+        print("No Targets Detected")
 
     # Import image as file
     image_file = open('current_image.jpg', 'rb')
@@ -398,8 +420,8 @@ def image_processing(e):
 
     # Keep the main thread running, otherwise signals are ignored.
     for frame in camera.capture_continuous(rawCapture, format="bgr", use_video_port=True):
-        # # Set loop iterationstart time - Just for testing
-        # start = time.time()
+        # Set loop iterationstart time - Just for testing
+        start = time.time()
         
         # Capture image using the PiCamera
         image = rawCapture.array
@@ -417,7 +439,6 @@ def image_processing(e):
 
         # Create thread to save and post image
         Thread(target=send_Image, args=(image, timestamp, detectedArucos, detectedTargets)).start()
-        #Thread(target=send_Image, args=(image, timestamp)).start()
 
         # clear the stream in preparation for the next frame
         rawCapture.truncate(0)
@@ -426,8 +447,8 @@ def image_processing(e):
         if (STOP_THREADS):
             break
 
-        # # Print loop duration - Just for testing
-        # print (str(time.time() - start)) 
+        # Print loop duration - Just for testing
+        print (str(time.time() - start))
 
 
 if __name__ == '__main__':
