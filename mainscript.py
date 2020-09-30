@@ -66,8 +66,8 @@ A1_CASCADE = cv2.CascadeClassifier('cascade_A1.xml')
 # A2_CASCADE = cv2.CascadeClassifier('cascade_A2.xml')
 
 # Color mask Params
-LOWER_YELLOW = np.array([25,100,100])
-UPPER_YELLOW = np.array([35,255,255])
+LOWER_YELLOW = np.array([30,100,165])
+UPPER_YELLOW = np.array([40,180,220])
 
 
 # BME280 temperature/pressure/humidity sensor
@@ -217,7 +217,13 @@ def other_sensors(e):
             except requests.ConnectionError:
                 pass
 
-
+def send_microphoneData(data):
+    try:
+        r = requests.post(SENSOR_ENDPOINT, json=data, timeout=SENSOR_POST_TIMEOUT)
+    except requests.Timeout:
+        pass
+    except requests.ConnectionError:
+        pass
 
 
 def noise_sensor(e):
@@ -271,14 +277,7 @@ def noise_sensor(e):
             }
             #print(data)
 
-            try:
-                r = requests.post(SENSOR_ENDPOINT, json=data, timeout=SENSOR_POST_TIMEOUT)
-            except requests.Timeout:
-                # back off and retry
-                pass
-            except requests.ConnectionError:
-                pass
-
+            Thread(target=send_microphoneData, args=data).start()
 
         else:
             sdata = stream.read(CHUNK)
@@ -310,10 +309,11 @@ def init_Camera():
     return camera, rawCapture
 
 
+previous_target_A1 = False
 
 # Process image to detect any Aruco markers
 def detect_Aruco(image, gray):
-    global ARUCO_DICT_100, ARUCO_DICT_250, ARUCO_DICT_1000, ARUCO_PARAMETERS
+    global ARUCO_DICT_100, ARUCO_DICT_250, ARUCO_DICT_1000, ARUCO_PARAMETERS, previous_target_A1
 
     # Detect the markers.
     corners, ids, rejectedImgPoints = aruco.detectMarkers(gray,ARUCO_DICT_100,parameters=ARUCO_PARAMETERS)
@@ -322,6 +322,7 @@ def detect_Aruco(image, gray):
     if (len(corners) > 0):
         image = aruco.drawDetectedMarkers(image, corners, ids)
         ids = ids.flatten()
+        previous_target_A1 = False
     else:
         # Detect the markers.
         corners, ids, rejectedImgPoints = aruco.detectMarkers(gray, ARUCO_DICT_250, parameters=ARUCO_PARAMETERS)
@@ -330,14 +331,16 @@ def detect_Aruco(image, gray):
         if (len(corners) > 0):
             image = aruco.drawDetectedMarkers(image, corners, ids)
             ids = ids.flatten()
-        else:
-            # Detect the markers.
-            corners, ids, rejectedImgPoints = aruco.detectMarkers(gray, ARUCO_DICT_1000, parameters=ARUCO_PARAMETERS)
-
-            # Markup the original image if marker detected
-            if (len(corners) > 0):
-                image = aruco.drawDetectedMarkers(image, corners, ids)
-                ids = ids.flatten()
+            previous_target_A1 = False
+        # else:
+        #     # Detect the markers.
+        #     corners, ids, rejectedImgPoints = aruco.detectMarkers(gray, ARUCO_DICT_1000, parameters=ARUCO_PARAMETERS)
+        #
+        #     # Markup the original image if marker detected
+        #     if (len(corners) > 0):
+        #         image = aruco.drawDetectedMarkers(image, corners, ids)
+        #         ids = ids.flatten()
+        #         previous_target_A1 = False
 
     return image, ids
 
@@ -345,16 +348,19 @@ def detect_Aruco(image, gray):
 
 # Process image to detect any A type targets
 def detect_Targets(image, gray, detectedTargets):
-    global LOWER_YELLOW, UPPER_YELLOW, A1_CASCADE
+    global LOWER_YELLOW, UPPER_YELLOW, A1_CASCADE, previous_target_A1
 
     # Detect A1 targets using cascade classifier
     targets = A1_CASCADE.detectMultiScale(gray, 1.05, 1, 0 | cv2.CASCADE_SCALE_IMAGE, minSize=(100, 100))
     # If A1 target detected then update detected targets
     if (len(targets) > 0):
-        detectedTargets[0] = True
-        # Draw boundary box for deteted target on image
-        for (x, y, w, h) in targets:
-            cv2.rectangle(image, (x, y), (x + w, y + h), (255, 0, 0), 2)
+        if previous_target_A1:
+            detectedTargets[0] = True
+            # Draw boundary box for deteted target on image
+            for (x, y, w, h) in targets:
+                cv2.rectangle(image, (x, y), (x + w, y + h), (255, 0, 0), 2)
+        else:
+            previous_target_A1 = True
     # Detect A2 targets using color mask
     else:
         hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
@@ -364,8 +370,7 @@ def detect_Targets(image, gray, detectedTargets):
             detectedTargets[1] = True
             for prop in regionprops(label(yellow_mask)):
                 cv2.rectangle(image, (prop.bbox[1], prop.bbox[0]), (prop.bbox[3], prop.bbox[2]), (0, 255, 0), 2)
-            ############### NEED TO ADD BOUNDARY BOX FOR DETECTED TARGET CODE HERE ###############
-
+        previous_target_A1 = False
 
     # return updated image with detected target boxes   
     return image, detectedTargets
@@ -374,7 +379,6 @@ def detect_Targets(image, gray, detectedTargets):
 
 # Send current image to GCS
 def send_Image(image, timestamp, detectedArucos, detectedTargets):
-#def send_Image(image, timestamp):
     global POST_TIMEOUT, IMAGE_ENDPOINT
     # Set loop iterationstart time - Just for testing
     # start = time.time()
@@ -437,7 +441,7 @@ def image_processing(e):
         detectedTargets = [None] * 2
 
         image, detectedArucos = detect_Aruco(image, gray)
-        ## Only if no Aruco markers are detected should target A markers be searched for
+        # Only if no Aruco markers are detected should target A markers be searched for
         if (detectedArucos is None):
             image, detectedTargets = detect_Targets(image, gray, detectedTargets)
 
