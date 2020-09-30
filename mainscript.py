@@ -10,6 +10,8 @@ import numpy as np
 import math
 import cv2
 
+from skimage.measure import label, regionprops
+
 try:
     # Transitional fix for breaking change in LTR559
     from ltr559 import LTR559
@@ -346,7 +348,7 @@ def detect_Targets(image, gray, detectedTargets):
     global LOWER_YELLOW, UPPER_YELLOW, A1_CASCADE
 
     # Detect A1 targets using cascade classifier
-    targets = A1_CASCADE.detectMultiScale(gray, 1.05, 1, 0 | cv2.CASCADE_SCALE_IMAGE, minSize=(30, 30))
+    targets = A1_CASCADE.detectMultiScale(gray, 1.05, 1, 0 | cv2.CASCADE_SCALE_IMAGE, minSize=(100, 100))
     # If A1 target detected then update detected targets
     if (len(targets) > 0):
         detectedTargets[0] = True
@@ -360,6 +362,8 @@ def detect_Targets(image, gray, detectedTargets):
         # If A2 target detected then update detected targets
         if (sum(sum(yellow_mask)) > 50):
             detectedTargets[1] = True
+            for prop in regionprops(label(yellow_mask)):
+                cv2.rectangle(image, (prop.bbox[1], prop.bbox[0]), (prop.bbox[3], prop.bbox[2]), (0, 255, 0), 2)
             ############### NEED TO ADD BOUNDARY BOX FOR DETECTED TARGET CODE HERE ###############
 
 
