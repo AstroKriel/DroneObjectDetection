@@ -7,10 +7,14 @@ $conn = new mysqli($servername, $username, $password, $db_name);
 if ($conn->connect_error) {
     die("Connection failed: " . $conn->connect_error);
 }
-$sql = "SELECT Name FROM images ORDER BY id DESC LIMIT 1;";
+$sql = "SELECT Name FROM images ORDER BY id DESC LIMIT 7;";
 $result = $conn->query($sql);
-$row = $result->fetch_assoc();
 
-echo $row["Name"];
+$response = '[';
+while($row = $result->fetch_assoc()) {
+    $response .= '{"Name":"'. $row["Name"] . '"},';
+}
+$response = rtrim($response, ",") . "]";
+echo $response;
 
 ?>

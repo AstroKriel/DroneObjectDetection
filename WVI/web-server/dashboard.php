@@ -20,18 +20,6 @@
 
 <?php
 
-// setup static page
-//echo "hello there dashboard user<br><br>";
-
-// ajax calls for new image url
-//fetch(make new url that just returns newest url as response)
-// setup javascript state to hold onto existing images to add them to history list
-
-
-// ajax calls for new data
-//fetch(make new url that just returns most recent data of each sensor)
-// setup javascript state to hold onto existing data to keep charts populated and scrolling
-
 // ajax calls for mission status
 //fetch(make new url that just returns a mission status string)
 
@@ -69,9 +57,23 @@ if ($result->num_rows > 0) {
 
 </div>
 <div id="rightHalf">
+<div id="imageSection">
 <div id="bigImage">
+<img class='cameraImage'><!-- width='480'-->
+<br>
+</div>
+<div id="imageHistory">
+<img class='cameraImage'><!-- width='160'-->
+<img class='cameraImage'><!-- width='160'-->
+<img class='cameraImage'><!-- width='160'-->
+<img class='cameraImage'><!-- width='160'-->
+<img class='cameraImage'><!-- width='160'-->
+<img class='cameraImage'><!-- width='160'-->
+</div>
+</div>
+<p id='statusBar'>Hello There</p>
 <?php
-
+/*
 $sql = "SELECT Name,Status FROM images ORDER BY id DESC LIMIT 5;";
 $result = $conn->query($sql);
 
@@ -94,7 +96,7 @@ while($row = $result->fetch_assoc()) {
                 echo "Found Aruco #$number";
             }
         }
-        */
+        *//*
         ?></div><div id="imageHistory"><?php
         $first = 1;
     } else {
@@ -103,11 +105,12 @@ while($row = $result->fetch_assoc()) {
 }
 
 $conn->close();
-
+*/
 
 ?>
 
 </div>
+
 </div>
 </div>
 <script src="assets/script.js"></script>

@@ -9,7 +9,7 @@ if(isset(getallheaders()["B-Detected"])) $detection = $detection . getallheaders
 //file_put_contents("uploads/test.txt", var_export(getallheaders(), true));
 file_put_contents("uploads/test.txt", $detection);
 
-$filename = time();
+$filename = microtime(false);
 
 //get detection url vars
 
@@ -39,9 +39,15 @@ if ($conn->connect_error) {
 
 //$outut = var_export($_FILES, true);
 
-$sql = "CALL insert_image('$filename','$detection');";
+$sql = "CALL insert_image('$filename','');";
 //$sql = "CALL insert_image('$filename','$outut');";
 $conn->query($sql);
+
+if($detection != '') {
+    $sql = "CALL insert_testing('msg','$detection');";
+    $conn->query($sql);
+}
+
 /*
 $sql = "SELECT Name,Status FROM images ORDER BY Status LIMIT 1;";
 $result = $conn->query($sql);
