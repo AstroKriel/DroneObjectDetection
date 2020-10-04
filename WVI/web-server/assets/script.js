@@ -149,8 +149,16 @@ let sensorRefresher = window.setInterval(function() {
                 }
                 if(data.packet_type === 'msg' && data.id > lastIDs['msg']) {
                     if(data.contents === '0 seconds of calibration left') {
-                        
                         location.reload();
+                    } else if(data.contents.includes('A1')) {
+                        let audio = new Audio('assets/A1.mp3');
+                        audio.play();
+                    } else if(data.contents.includes('A2')) {
+                        let audio = new Audio('assets/A2.mp3');
+                        audio.play();
+                    } else if(data.contents.includes('Aruco')) {
+                        let audio = new Audio('assets/Aruco.mp3');
+                        audio.play();
                     }
 
                     lastIDs['msg'] = data.id;
