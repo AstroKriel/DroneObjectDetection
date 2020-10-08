@@ -49,7 +49,6 @@ POST_TIMEOUT = 4
 # Stop threads on keyboard interrupt
 STOP_THREADS = False
 
-
 # Define resolution and framerate for captured video
 IMAGE_WIDTH = 640
 IMAGE_HEIGHT = 480
@@ -167,7 +166,7 @@ def other_sensors(e):
     global WAIT_TIME, SENSOR_POST_TIMEOUT, STOP_THREADS
 
     WAIT_TIME_SECONDS = 1
-    CalibrateTime = 20
+    CalibrateTime = 20 #10*60
     mode = 0
     counter = 0
     ticker = Event()
@@ -185,6 +184,10 @@ def other_sensors(e):
                     baseline_data_nh3 = baseline_nh3["data"]
                     mode = 1
                 elif counter == CalibrateTime-WAIT_TIME:
+                    temp, temp_unit = retrieve_temp()
+                    pressure, pressure_unit = retrieve_pressure()
+                    humidity, humidity_unit = retrieve_humidity()
+
                     #trigger noise sensor thread to resume
                     e.set()
 
@@ -204,11 +207,20 @@ def other_sensors(e):
                     "pressure": {"data": pressure, "unit": pressure_unit},
                     "humidity": {"data": humidity, "unit": humidity_unit},
                     "lux": {"data": lux, "unit": lux_unit},
-                    "gas" : {"oxidising":{"data": oxidising_val, "unit": "%"},
-                             "reducing":{"data": reducing_val, "unit": "%"},
-                             "nh3":{"data": nh3_val, "unit": "%"}}
+                    "gas" : {"oxidising": {"data": oxidising_val, "unit": "%"},
+                             "reducing": {"data": reducing_val, "unit": "%"},
+                             "nh3": {"data": nh3_val, "unit": "%"}}
                 }
-            # print(data)
+                #print("%s: %s" % (datetime.now(), data))
+                try:
+                    r = requests.post(SENSOR_ENDPOINT, json=data, timeout=SENSOR_POST_TIMEOUT)
+                except requests.Timeout:
+                    # back off and retry
+                    pass
+                except requests.ConnectionError:
+                    pass
+
+            print(data)
             try:
                 r = requests.post(SENSOR_ENDPOINT, json=data, timeout=SENSOR_POST_TIMEOUT)
             except requests.Timeout:
@@ -217,13 +229,19 @@ def other_sensors(e):
             except requests.ConnectionError:
                 pass
 
-def send_microphoneData(data):
-    try:
-        r = requests.post(SENSOR_ENDPOINT, json=data, timeout=SENSOR_POST_TIMEOUT)
-    except requests.Timeout:
-        pass
-    except requests.ConnectionError:
-        pass
+def send_microphoneData(dbSPL):
+    if dbSPL != 0.0:
+        data = {
+            "noise": {"data": dbSPL, "unit": "dbSPL"}
+        }
+        print(data)
+        #print("%s: %s" % (datetime.now(), data))
+        try:
+            r = requests.post(SENSOR_ENDPOINT, json=data, timeout=SENSOR_POST_TIMEOUT)
+        except requests.Timeout:
+            pass
+        except requests.ConnectionError:
+            pass
 
 
 def noise_sensor(e):
@@ -272,13 +290,7 @@ def noise_sensor(e):
             if dbSPL > maxSPL:
                 maxSPL = dbSPL
 
-            data = {
-                "noise": {"data": dbSPL, "unit": "dbSPL"}
-            }
-            #print(data)
-
-            Thread(target=send_microphoneData, args=data).start()
-
+            Thread(target=send_microphoneData, args=[dbSPL]).start()
         else:
             sdata = stream.read(CHUNK)
             MSec = MSec + 500
@@ -287,9 +299,6 @@ def noise_sensor(e):
     stream.stop_stream()
     stream.close()
     audio.terminate()
-
-
-
 
 # Initialise camera
 def init_Camera():
@@ -301,7 +310,7 @@ def init_Camera():
     camera.framerate = FRAME_RATE
 
     # Define video capture parameters
-    rawCapture = PiRGBArray(camera, size = camera.resolution)
+    rawCapture = PiRGBArray(camera, size=camera.resolution)
 
     # Allow the camera to warmup
     time.sleep(0.1)
@@ -393,15 +402,16 @@ def send_Image(image, timestamp, detectedArucos, detectedTargets):
 
     if (detectedTargets[0] is not None):
         headers['A1-detected'] = 'True'
-        print("A1 Detected")
+        #print("A1 Detected")
     elif (detectedTargets[1] is not None):
         headers['A2-detected'] = 'True'
-        print("A2 Detected")
+        #print("A2 Detected")
     elif (detectedArucos is not None):
         headers['B-detected'] = str(detectedArucos)
-        print(str(detectedArucos))
+        #print(str(detectedArucos))
     else:
-        print("No Targets Detected")
+        pass
+        #print("No Targets Detected")
 
     # Import image as file
     image_file = open('current_image.jpg', 'rb')
@@ -456,7 +466,7 @@ def image_processing(e):
             break
 
         # Print loop duration - Just for testing
-        print (str(time.time() - start))
+        #print (str(time.time() - start))
 
 
 if __name__ == '__main__':
