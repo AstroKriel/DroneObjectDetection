@@ -357,7 +357,7 @@ def detect_Aruco(image, gray):
 
 # Process image to detect any A type targets
 def detect_Targets(image, gray, detectedTargets):
-    global LOWER_YELLOW, UPPER_YELLOW, A1_CASCADE, previous_target_A1
+    global LOWER_YELLOW, UPPER_YELLOW, A1_CASCADE, A2_CASCADE, previous_target_A1
 
     # Detect A1 targets using cascade classifier
     targets = A1_CASCADE.detectMultiScale(gray, 1.05, 1, 0 | cv2.CASCADE_SCALE_IMAGE, minSize=(100, 100))
@@ -373,7 +373,7 @@ def detect_Targets(image, gray, detectedTargets):
     
     # Detect A2 targets using color mask
     else:
-        targets = A2_CASCADE.detectMultiScale(gray, 1.05, 6, 0 | cv2.CASCADE_SCALE_IMAGE, minSize=(100, 100))
+        targets = A2_CASCADE.detectMultiScale(gray, 1.05, 6, 0 | cv2.CASCADE_SCALE_IMAGE, minSize=(30, 30))
         if (len(targets) > 0):
             detectedTargets[1] = True
             # Draw boundary box for deteted target on image
