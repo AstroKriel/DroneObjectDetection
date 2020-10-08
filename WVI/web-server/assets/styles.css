@@ -26,6 +26,13 @@
 
 #statusBar {
     width: 100%;
+    padding: 3px;
+    border: 1px solid black;
+}
+
+#previousStatus {
+    width: 100%;
+    padding: 3px;
     border: 1px solid black;
 }
 

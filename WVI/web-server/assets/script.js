@@ -64,11 +64,13 @@ let imageRefresher = window.setInterval(function() {
     fetch('/fetch_image')
         .then(response => response.json())
         .then(result => {
-            document.querySelector("#bigImage .cameraImage").setAttribute('src',"uploads/" + result[0].Name + ".jpg")
-            let historyImgList = document.querySelectorAll("#imageHistory .cameraImage")
-            for(let i=0;i<6;i++){
-                historyImgList[i].setAttribute('src',"uploads/" + result[i+1].Name + ".jpg")
-            }
+            //if(result.length() > 0) {
+                document.querySelector("#bigImage .cameraImage").setAttribute('src',"uploads/" + result[0].Name + ".jpg")
+                let historyImgList = document.querySelectorAll("#imageHistory .cameraImage")
+                for(let i=0;i<6;i++){
+                    historyImgList[i].setAttribute('src',"uploads/" + result[i+1].Name + ".jpg")
+                }
+            //}
         });
 }, 500);
 //window.clearInterval(imageRefresher);
@@ -86,6 +88,7 @@ var lastIDs = {
 }
 
 var counter = 0;
+var audioCounter = 0;
 let sensorRefresher = window.setInterval(function() {
     fetch('/fetch_data')
         .then(response => response.json())
@@ -148,21 +151,34 @@ let sensorRefresher = window.setInterval(function() {
                         Highcharts.charts[7].series[0].addPoint([counter,Number(data.contents)],true,true);
                 }
                 if(data.packet_type === 'msg' && data.id > lastIDs['msg']) {
+                    function playAudio(targetType) {
+                        if(audioCounter < counter - 5) {
+                            let audio = new Audio(targetType);
+                            audio.play();
+                            audioCounter = counter;
+                        }
+                    }
+
+                    let message = '';
                     if(data.contents === '0 seconds of calibration left') {
                         location.reload();
                     } else if(data.contents.includes('A1')) {
-                        let audio = new Audio('assets/A1.mp3');
-                        audio.play();
+                        message = "Target A1 detected.";
+                        playAudio('assets/A1.mp3');
                     } else if(data.contents.includes('A2')) {
-                        let audio = new Audio('assets/A2.mp3');
-                        audio.play();
-                    } else if(data.contents.includes('Aruco')) {
-                        let audio = new Audio('assets/Aruco.mp3');
-                        audio.play();
+                        message = "Target A2 detected.";
+                        playAudio('assets/A2.mp3');
+                    } else if(data.contents.includes('[')) {
+                        let arucoID = data.contents.charAt(data.contents.indexOf('[') + 1);
+                        message = "Aruco Marker ID=" + arucoID + " detected.";
+                        playAudio('assets/Aruco.mp3');
                     }
 
                     lastIDs['msg'] = data.id;
-                    document.querySelector("#statusBar").innerText = data.contents;
+                    document.querySelector("#statusBar").innerText = 'Current Status: ' + message;
+                    document.querySelector("#previousStatus").innerText = 'Previous Update: ' + message;
+                } else if(data.id > lastIDs['msg'] + 15) {
+                    document.querySelector("#statusBar").innerText = 'Current Status: Mission in progress.';
                 }
             });
         })

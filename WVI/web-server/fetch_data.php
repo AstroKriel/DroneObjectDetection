@@ -18,7 +18,7 @@ foreach($data_types as $data_type) {
     $conn->next_result();
 
     if($data_type == 'msg' && $row["contents"] == '0 seconds of calibration left') {
-        $sql = "CALL insert_testing('msg','MISSION STARTED');";
+        $sql = "CALL insert_testing('msg','Mission started.');";
         $conn->query($sql);
     }   
 }
