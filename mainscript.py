@@ -166,7 +166,7 @@ def other_sensors(e):
     global WAIT_TIME, SENSOR_POST_TIMEOUT, STOP_THREADS
 
     WAIT_TIME_SECONDS = 1
-    CalibrateTime = 20 #10*60
+    CalibrateTime = 120 #10*60
     mode = 0
     counter = 0
     ticker = Event()
@@ -354,10 +354,9 @@ def detect_Aruco(image, gray):
     return image, ids
 
 
-
 # Process image to detect any A type targets
 def detect_Targets(image, gray, detectedTargets):
-    global LOWER_YELLOW, UPPER_YELLOW, A1_CASCADE, previous_target_A1
+    global LOWER_YELLOW, UPPER_YELLOW, A1_CASCADE, A2_CASCADE, previous_target_A1
 
     # Detect A1 targets using cascade classifier
     targets = A1_CASCADE.detectMultiScale(gray, 1.05, 1, 0 | cv2.CASCADE_SCALE_IMAGE, minSize=(100, 100))
@@ -370,21 +369,26 @@ def detect_Targets(image, gray, detectedTargets):
                 cv2.rectangle(image, (x, y), (x + w, y + h), (255, 0, 0), 2)
         else:
             previous_target_A1 = True
+
     # Detect A2 targets using color mask
     else:
-        # Detect A2 targets using cascade classifier
-        targets = A2_CASCADE.detectMultiScale(gray, 1.05, 5, 0 | cv2.CASCADE_SCALE_IMAGE, minSize=(100, 100))
-        # check colour mask
-        hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
-        yellow_mask = cv2.inRange(hsv, LOWER_YELLOW, UPPER_YELLOW)
-        # If A2 target detected then update detected targets
-        if (len(targets) > 0) and (sum(sum(yellow_mask)) > 50):
-            # indicate that target A2 has been detected
+        targets = A2_CASCADE.detectMultiScale(gray, 1.05, 6, 0 | cv2.CASCADE_SCALE_IMAGE, minSize=(30, 30))
+        if (len(targets) > 0):
             detectedTargets[1] = True
             # Draw boundary box for deteted target on image
-            for prop in regionprops(label(yellow_mask)):
-                cv2.rectangle(image, (prop.bbox[1], prop.bbox[0]), (prop.bbox[3], prop.bbox[2]), (0, 255, 0), 2)
-        # indicate that a target A1 not detected
+            for (x, y, w, h) in targets:
+                cv2.rectangle(image, (x, y), (x + w, y + h), (255, 0, 0), 2)
+
+        # # Detect A2 targets using color mask
+        # else:
+        #     hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+        #     yellow_mask = cv2.inRange(hsv, LOWER_YELLOW, UPPER_YELLOW)
+        #     # If A2 target detected then update detected targets
+        #     if (sum(sum(yellow_mask)) > 50):
+        #         detectedTargets[1] = True
+        #         for prop in regionprops(label(yellow_mask)):
+        #             cv2.rectangle(image, (prop.bbox[1], prop.bbox[0]), (prop.bbox[3], prop.bbox[2]), (0, 255, 0), 2)
+
         previous_target_A1 = False
 
     # return updated image with detected target boxes   
