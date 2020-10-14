@@ -72,6 +72,7 @@ let imageRefresher = window.setInterval(function() {
                 }
             //}
         });
+    sensorRefresh();
 }, 500);
 //window.clearInterval(imageRefresher);
 
@@ -89,68 +90,74 @@ var lastIDs = {
 
 var counter = 0;
 var audioCounter = 0;
-let sensorRefresher = window.setInterval(function() {
+//let sensorRefresher = window.setInterval(
+var sensorRefresh = function() {
     fetch('/fetch_data')
-        .then(response => response.json())
+        .then(response => {
+            //console.log(response.status);
+            return response.json();
+        })
         .then(result => {
+            //console.log('got this far');
             result.forEach(data => {
-                if(data.packet_type === 'temperature' && data.id > lastIDs['temperature']) {
-                    lastIDs['temperature'] = data.id;
+                let dataID = Number(data.id);
+                if(data.packet_type === 'temperature' && dataID > lastIDs['temperature']) {
+                    lastIDs['temperature'] = dataID;
                     if(Highcharts.charts[0].series[0].data.length < 20)
                         Highcharts.charts[0].series[0].addPoint([counter,Number(data.contents)]);
                     else
                         Highcharts.charts[0].series[0].addPoint([counter,Number(data.contents)],true,true);
                 }
-                if(data.packet_type === 'humidity' && data.id > lastIDs['humidity']) {
-                    lastIDs['humidity'] = data.id;
+                if(data.packet_type === 'humidity' && dataID > lastIDs['humidity']) {
+                    lastIDs['humidity'] = dataID;
                     if(Highcharts.charts[1].series[0].data.length < 20)
                         Highcharts.charts[1].series[0].addPoint([counter,Number(data.contents)]);
                     else
                         Highcharts.charts[1].series[0].addPoint([counter,Number(data.contents)],true,true);
                 }
-                if(data.packet_type === 'lux' && data.id > lastIDs['lux']) {
-                    lastIDs['lux'] = data.id;
+                if(data.packet_type === 'lux' && dataID > lastIDs['lux']) {
+                    lastIDs['lux'] = dataID;
                     if(Highcharts.charts[2].series[0].data.length < 20)
                         Highcharts.charts[2].series[0].addPoint([counter,Number(data.contents)]);
                     else
                         Highcharts.charts[2].series[0].addPoint([counter,Number(data.contents)],true,true);
                 }
-                if(data.packet_type === 'pressure' && data.id > lastIDs['pressure']) {
-                    lastIDs['pressure'] = data.id;
+                if(data.packet_type === 'pressure' && dataID > lastIDs['pressure']) {
+                    lastIDs['pressure'] = dataID;
                     if(Highcharts.charts[3].series[0].data.length < 20)
                         Highcharts.charts[3].series[0].addPoint([counter,Number(data.contents)]);
                     else
                         Highcharts.charts[3].series[0].addPoint([counter,Number(data.contents)],true,true);
                 }
-                if(data.packet_type === 'noise' && data.id > lastIDs['noise']) {
-                    lastIDs['noise'] = data.id;
+                if(data.packet_type === 'noise' && dataID > lastIDs['noise']) {
+                    lastIDs['noise'] = dataID;
                     if(Highcharts.charts[4].series[0].data.length < 40)
                         Highcharts.charts[4].series[0].addPoint([counter,Number(data.contents)]);
                     else
                         Highcharts.charts[4].series[0].addPoint([counter,Number(data.contents)],true,true);
                 }
-                if(data.packet_type === 'gas/oxidising' && data.id > lastIDs['gas/oxidising']) {
-                    lastIDs['gas/oxidising'] = data.id;
+                if(data.packet_type === 'gas/oxidising' && dataID > lastIDs['gas/oxidising']) {
+                    lastIDs['gas/oxidising'] = dataID;
                     if(Highcharts.charts[5].series[0].data.length < 20)
                         Highcharts.charts[5].series[0].addPoint([counter,Number(data.contents)]);
                     else
                         Highcharts.charts[5].series[0].addPoint([counter,Number(data.contents)],true,true);
                 }
-                if(data.packet_type === 'gas/reducing' && data.id > lastIDs['gas/reducing']) {
-                    lastIDs['gas/reducing'] = data.id;
+                if(data.packet_type === 'gas/reducing' && dataID > lastIDs['gas/reducing']) {
+                    lastIDs['gas/reducing'] = dataID;
                     if(Highcharts.charts[6].series[0].data.length < 20)
                         Highcharts.charts[6].series[0].addPoint([counter,Number(data.contents)]);
                     else
                         Highcharts.charts[6].series[0].addPoint([counter,Number(data.contents)],true,true);
                 }
-                if(data.packet_type === 'gas/nh3' && data.id > lastIDs['gas/nh3']) {
-                    lastIDs['gas/nh3'] = data.id;
+                if(data.packet_type === 'gas/nh3' && dataID > lastIDs['gas/nh3']) {
+                    lastIDs['gas/nh3'] = dataID;
                     if(Highcharts.charts[7].series[0].data.length < 20)
                         Highcharts.charts[7].series[0].addPoint([counter,Number(data.contents)]);
                     else
                         Highcharts.charts[7].series[0].addPoint([counter,Number(data.contents)],true,true);
                 }
-                if(data.packet_type === 'msg' && data.id > lastIDs['msg']) {
+                if(data.packet_type === 'msg' && dataID > lastIDs['msg']) {
                     function playAudio(targetType) {
                         if(audioCounter < counter - 5) {
                             let audio = new Audio(targetType);
@@ -172,12 +179,14 @@ let sensorRefresher = window.setInterval(function() {
                         let arucoID = data.contents.charAt(data.contents.indexOf('[') + 1);
                         message = "Aruco Marker ID=" + arucoID + " detected.";
                         playAudio('assets/Aruco.mp3');
+                    } else {
+                        message = data.contents;
                     }
 
-                    lastIDs['msg'] = data.id;
+                    lastIDs['msg'] = dataID;
                     document.querySelector("#statusBar").innerText = 'Current Status: ' + message;
                     document.querySelector("#previousStatus").innerText = 'Previous Update: ' + message;
-                } else if(data.id > lastIDs['msg'] + 15) {
+                } else if(dataID > lastIDs['msg'] + 15) {
                     document.querySelector("#statusBar").innerText = 'Current Status: Mission in progress.';
                 }
             });
@@ -188,5 +197,5 @@ let sensorRefresher = window.setInterval(function() {
         Xlabel.innerHTML = Xlabel.innerHTML / 2;
     })*/
     counter += 0.5;
-}, 500);
+}
 //window.clearInterval(sensorRefresher);

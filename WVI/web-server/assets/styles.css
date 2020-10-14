@@ -42,13 +42,14 @@
 }
 
 #bigImage > .cameraImage {
-    /* height: 400px; */
+    height: 480px;
 }
 
 #imageHistory {
     flex: 1;
     overflow: scroll;
-    height: 70vh;
+    height: 75vh;
+    border: 1px solid black;
     /*white-space: nowrap;*/
 }
 
@@ -65,5 +66,5 @@
     height: 250px;
     border-bottom: 1px dashed gray;
     /* margin-bottom: 20px; */
-    /* width: 100%; */
+    width: 100%;
 }
