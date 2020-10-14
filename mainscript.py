@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+ #!/usr/bin/env python3
 import time
 import colorsys
 import sys
@@ -62,7 +62,7 @@ ARUCO_PARAMETERS = aruco.DetectorParameters_create()
 
 # Load cascade classifier for targets A1 and A2
 A1_CASCADE = cv2.CascadeClassifier('cascade_A1.xml')
-# A2_CASCADE = cv2.CascadeClassifier('cascade_A2.xml')
+A2_CASCADE = cv2.CascadeClassifier('cascade_A2.xml')
 
 # Color mask Params
 LOWER_YELLOW = np.array([30,100,165])
@@ -372,13 +372,19 @@ def detect_Targets(image, gray, detectedTargets):
             previous_target_A1 = True
     # Detect A2 targets using color mask
     else:
+        # Detect A2 targets using cascade classifier
+        targets = A2_CASCADE.detectMultiScale(gray, 1.05, 5, 0 | cv2.CASCADE_SCALE_IMAGE, minSize=(100, 100))
+        # check colour mask
         hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
         yellow_mask = cv2.inRange(hsv, LOWER_YELLOW, UPPER_YELLOW)
         # If A2 target detected then update detected targets
-        if (sum(sum(yellow_mask)) > 50):
+        if (len(targets) > 0) and (sum(sum(yellow_mask)) > 50):
+            # indicate that target A2 has been detected
             detectedTargets[1] = True
+            # Draw boundary box for deteted target on image
             for prop in regionprops(label(yellow_mask)):
                 cv2.rectangle(image, (prop.bbox[1], prop.bbox[0]), (prop.bbox[3], prop.bbox[2]), (0, 255, 0), 2)
+        # indicate that a target A1 not detected
         previous_target_A1 = False
 
     # return updated image with detected target boxes   
